@@ -12,6 +12,7 @@ Usage:
 $kp = new AppZz\Http\Kinopoisk\Kinopoisk (1272854);
 $parser = $kp->parser();
 $rating = $kp->rating();
+
 $data = $parser->parse();
 print_r ($data);
 
