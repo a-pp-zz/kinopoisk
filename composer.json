@@ -18,7 +18,8 @@
         "php": ">=5.3.3",
         "appzz/curl-client": "2.*",
         "appzz/arr": "1.*",
-        "appzz/html-dom-parser": "1.*"
+        "appzz/html-dom-parser": "1.*",
+        "appzz/fast-image": "dev-master"
     },
     "autoload": {
         "psr-4": {"AppZz\\Http\\Kinopoisk\\": "src/"}

@@ -1,28 +1,37 @@
 <?php
-namespace AppZz\Http\TMDB\Vendors;
-use \AppZz\Http\CurlClient;
+namespace AppZz\Http\Kinopoisk\Vendors;
+use \AppZz\Http\Kinopoisk\Kinopoisk;
 use \AppZz\Helpers\Arr;
 use \AppZz\Helpers\HtmlDomParser;
-use \AppZz\Http\TMDB\Helpers\FastImage;
+use \AppZz\Http\Kinopoisk\Helpers\FastImage;
 
-class Parser extends \AppZz\Http\TMDB\DB {
+/**
+ * Mobile version parser
+ * @package Kinopoisk/Parser
+ * @author CoolSwitcher
+ * @version 3.0.0
+ */
+class Parser extends Kinopoisk {
 
-	const BASE_URL    = 'https://www.kinopoisk.ru/film/%d/';
-	const POSTER_URL  = 'https://st.kp.yandex.net/images/film_big/%d.jpg';
-	const STATIC_HOST = 'st.kp.yandex.net';
+	protected $_url_tpl = 'https://www.kinopoisk.ru/film/%d/';
+	protected $_agent   = 'Mozilla/5.0 (iPhone; CPU iPhone OS 10_0 like Mac OS X) AppleWebKit/602.1.38 (KHTML, like Gecko) Version/10.0 Mobile/14A5297c Safari/602.1';
 
-	public function __construct ()
+    public function __construct ($kpid = null)
+    {
+    	parent::__construct ($kpid);
+    	$this->_set_url ();
+    }
+
+	public function parse ($force = false)
 	{
-		$this->_agent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 10_0 like Mac OS X) AppleWebKit/602.1.38 (KHTML, like Gecko) Version/10.0 Mobile/14A5297c Safari/602.1';
-	}
-
-	public function parse ($id)
-	{
-		$url = sprintf (self::BASE_URL, $id);
-		//$body = file_get_contents('/Users/coolswitcher/Downloads/tmp/kp.html');
-		$body = $this->_get_page ($url);
-
-		//file_put_contents('/Users/coolswitcher/Downloads/tmp/kp.html', $body);
+		if ($this->_output AND is_file ($this->_output) AND $force !== true) {
+			$body = file_get_contents($this->_output);
+		} else {
+			$body = $this->_get_url ();
+			if ($this->_output) {
+				file_put_contents($this->_output, $body);
+			}
+		}
 
 		$data = $this->_parse ($body);
 
@@ -35,35 +44,14 @@ class Parser extends \AppZz\Http\TMDB\DB {
 				}
 			}
 
-			if (empty ($check_str))
+			if (empty ($check_str)) {
 				$data = NULL;
+			} else {
+				$data['kp_id'] = $this->_kpid;
+			}
 		}
-
-		if (empty($data)) {
-			$this->_error('Не удалось спарсить страницу с фильмом', 1000);
-		}
-
-		$data['kp_id'] = $id;
 
 		return $data;
-	}
-
-	/**
-	 * @deprecated
-	 */
-	private function _get_poster ($id)
-	{
-		$url = sprintf (self::POSTER_URL, $id);
-		$request = CurlClient::head($url);
-		$request->agent($this->_agent);
-		$request->set_option('CURLOPT_FOLLOWLOCATION', FALSE);
-		$request->set_option('CURLOPT_MAXREDIRS', 0);
-		$response = $request->send();
-
-		if ($response === 200)
-			return $url;
-
-		return FALSE;
 	}
 
 	private function _parse ($body)
@@ -178,8 +166,13 @@ class Parser extends \AppZz\Http\TMDB\DB {
 					$value = implode (', ', $value);
 				break;
 
+				case 'rating_kp':
+				case 'rating_imdb':
+					$value = (float)$value;
+				break;	
+
 				case 'gallery':
-					$pat = '#('.self::STATIC_HOST.'\/images\/kadr\/sm_\d+\.jpg)#iu';
+					$pat = '#('.Kinopoisk::YA_CDN_HOST.'\/images\/kadr\/sm_\d+\.jpg)#iu';
 
 					foreach ($value as &$image) {
 
@@ -199,39 +192,5 @@ class Parser extends \AppZz\Http\TMDB\DB {
 				break;
 			}
 		}
-	}
-
-	private function _get_page ($url)
-	{
-		$request = CurlClient::get($url, array ('force-version'=>'touch'));
-		$request->agent($this->_agent);
-		$request->referer('https://www.kinopoisk.ru/');
-
-		if ($this->_proxy) {
-            $request->proxy ($this->_proxy);
-            $request->accept('json');
-		} else {
-			$request->accept('html', 'gzip', 'ru-RU');
-		}
-
-		$request->cookie_file('/tmp/kinopoisk.ru.txt');
-		$response = $request->send();
-
-		if ($response !== 200) {
-			$this->_error ('Ошибка получения исходного кода страницы с фильмом', $response);
-		}
-
-		$body = $request->get_body();
-
-		if (empty($body)) {
-			$this->_error ('Пустой исходный код страницы', 1001);
-		}
-
-		return $body;
-	}
-
-	private function _error ($message, $code = 0)
-	{
-		throw new \Exception ($message, $code);
 	}
 }
