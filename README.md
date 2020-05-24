@@ -1,4 +1,5 @@
 # Kinopoisk Utils
+*Get main film info, get film ratings*
 
 **Install via composer:**
 
