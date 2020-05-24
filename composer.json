@@ -1,0 +1,26 @@
+{
+    "name": "appzz/kinopoisk",
+    "description": "Kinopoisk Utils",
+    "type": "library",
+    "keywords": [
+        "kinopoisk",
+        "rating",
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "CoolSwitcher",
+            "email": "ds@appzz.pw",
+            "role": "lead"
+        }
+    ],
+    "require": {
+        "php": ">=5.3.3",
+        "appzz/curl-client": "2.*",
+        "appzz/arr": "1.*",
+        "appzz/html-dom-parser": "1.*"
+    },
+    "autoload": {
+        "psr-4": {"AppZz\\Http\\Kinopoisk\\": "src/"}
+    }
+}
