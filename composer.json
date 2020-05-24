@@ -19,7 +19,7 @@
         "appzz/curl-client": "2.*",
         "appzz/arr": "1.*",
         "appzz/html-dom-parser": "1.*",
-        "appzz/fast-image": "dev-master"
+        "appzz/fast-image": "1.*"
     },
     "autoload": {
         "psr-4": {"AppZz\\Http\\Kinopoisk\\": "src/"}
