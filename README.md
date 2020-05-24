@@ -1,2 +1,2 @@
-# kinopoisk
-Kinopoisk
+# Kinopoisk
+Kinopoisk Utils
