@@ -18,6 +18,7 @@ class Kinopoisk {
     protected $_url_tpl;
     protected $_url;
     protected $_output;
+    protected $_force   = false;
 
     public function __construct ($kpid = null)
     {
@@ -68,6 +69,12 @@ class Kinopoisk {
         return $this;
     }
 
+    public function force ($force = true)
+    {
+        $this->_force = $force;
+        return $this;
+    }
+
     protected function _set_url ()
     {
         if ($this->_kpid) {
@@ -88,11 +95,12 @@ class Kinopoisk {
         $request->referer('https://www.kinopoisk.ru/');
 
         if ($this->_proxy) {
-            $request->proxy ($this->_proxy);
-            $request->accept('json');
-        } else {
-            $request->accept('html', 'gzip', 'ru-RU');
+            $proxy_host = Arr::get ($this->_proxy, 'host');
+            unset ($this->_proxy['host']);
+            $request->proxy ($proxy_host, $this->_proxy);
         }
+
+        $request->accept('html', 'gzip', 'ru-RU');
 
         $cookie_file = sys_get_temp_dir() . DIRECTORY_SEPARATOR . sprintf ('kinopoisk-%s.ru.txt', uniqid(true));
         $request->cookie_file($cookie_file);
