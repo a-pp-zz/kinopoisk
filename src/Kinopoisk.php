@@ -117,7 +117,29 @@ class Kinopoisk {
             $this->_error ('Пустой исходный код страницы', 1001);
         }
 
+        unlink($cookie_file);
+
         return $body;
+    }
+
+    public function _check_poster ($url)
+    {
+        $request = CurlClient::head($url, array (), array (), array ('CURLOPT_FOLLOWLOCATION'=>FALSE));
+        $request->agent('chrome');
+        $request->referer('https://www.kinopoisk.ru/');
+        $request->accept('html', 'gzip', 'ru-RU');
+        $cookie_file = sys_get_temp_dir() . DIRECTORY_SEPARATOR . sprintf ('kinopoisk-%s.ru.txt', uniqid(true));
+        $request->cookie_file($cookie_file);
+        $response = (int)$request->send();
+
+        if ($response >= 300 AND $response <= 310) {
+            $headers = $request->get_headers();
+            $location = Arr::get ($headers, 'location');
+            return (strpos($location, 'no-poster') === false);
+        }
+
+        unlink($cookie_file);
+        return true;
     }
 
     protected function _error ($message, $code = 0)

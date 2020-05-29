@@ -77,6 +77,13 @@ class Parser extends Kinopoisk {
 		return $this->_result;
 	}
 
+	private function _clean_string ($str)
+	{
+		$str = trim ($str);
+		$str = preg_replace("#\s{1,}$#iu", "", $str);
+		return $str;
+	}
+
 	private function _parse ($body)
 	{
 		$dom = HtmlDomParser::str_get_html($body);
@@ -102,7 +109,7 @@ class Parser extends Kinopoisk {
 			$f = $dom->find($pat, 0);
 
 			if ($f) {
-				$this->_result[$key] = trim ($f->plaintext);
+				$this->_result[$key] = $this->_clean_string ($f->plaintext);
 			}
 
 			unset ($f);
@@ -116,7 +123,7 @@ class Parser extends Kinopoisk {
 			}
 
 			if (isset ($d->itemprop) AND ($d->itemprop == 'description')) {
-				$this->_result['description'] = trim ($d->content);
+				$this->_result['description'] = $this->_clean_string ($d->content);
 				break;
 			}
 		}
@@ -136,7 +143,7 @@ class Parser extends Kinopoisk {
 
 			foreach ($f as $item) {
 				if ( ! empty ($item->itemprop) AND in_array ($item->itemprop, array_keys($persons))) {
-					$this->_result[$item->itemprop][] = trim ($item->plaintext);
+					$this->_result[$item->itemprop][] = $this->_clean_string ($item->plaintext);
 				}
 			}
 		}
@@ -156,7 +163,7 @@ class Parser extends Kinopoisk {
 				continue;
 			}
 			if ( ! empty ($creator) AND ! empty ($item->content)) {
-				$this->_result[$item->itemprop][] = trim ($item->content);
+				$this->_result[$item->itemprop][] = $this->_clean_string ($item->content);
 			}
 		}
 
@@ -167,7 +174,7 @@ class Parser extends Kinopoisk {
 
 			foreach ($f as $item) {
 				if (! empty ($item->itemprop) AND $item->itemprop == 'image') {
-					$this->_result['poster'] = trim ($item->content);
+					$this->_result['poster'] = $this->_clean_string ($item->content);
 				}
 			}
 
@@ -179,7 +186,7 @@ class Parser extends Kinopoisk {
 
 			foreach ($f as $img) {
 				if ( ! empty ($img->style)) {
-					$this->_result['picshots'][] = trim ($img->style);
+					$this->_result['picshots'][] = $this->_clean_string ($img->style);
 				}
 			}
 
@@ -217,14 +224,17 @@ class Parser extends Kinopoisk {
 			switch ($key) {
 				case 'country':
 					$values = explode (',', $value);
-					$values = array_map ('trim', $values);
-					$duration = array_pop ($values);
 
-					if (array_key_exists('duration', $this->_fields)) {
-						$this->_result['duration'] = $duration;
+					if ( ! empty ($values) AND count ($values) > 1) {
+						$values = array_map ('trim', $values);
+						$duration = array_pop ($values);
+
+						if (array_key_exists('duration', $this->_fields)) {
+							$this->_result['duration'] = $duration;
+						}
+
+						$value = implode (', ', $values);
 					}
-
-					$value = implode (', ', $values);
 				break;
 
 				case 'director':
@@ -239,17 +249,21 @@ class Parser extends Kinopoisk {
 				break;
 
 				case 'poster':
-					$fi = new FastImage ($value);
-					$size = $fi->get_size ();
+					if ($this->_check_poster ($value)) {
+						$fi = new FastImage ($value);
+						$size = $fi->get_size ();
 
-					if (is_array($size) AND count ($size) === 2) {
-						list ($width, $height) = $size;
+						if (is_array($size) AND count ($size) === 2) {
+							list ($width, $height) = $size;
+						} else {
+							$width = $height = 0;
+						}
+
+						$value = array ('image'=>$value, 'width'=>$width, 'height'=>$height);
+						unset($fi);
 					} else {
-						$width = $height = 0;
+						unset ($this->_result['poster']);
 					}
-
-					$value = array ('image'=>$value, 'width'=>$width, 'height'=>$height);
-					unset($fi);
 				break;
 
 				case 'picshots':
