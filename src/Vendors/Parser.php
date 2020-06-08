@@ -54,9 +54,9 @@ class Parser extends Kinopoisk {
     	return $this;
     }
 
-    public function titles (bool $titles = true)
+    public function titles ($titles = true)
     {
-    	$this->_titles = $titles;
+    	$this->_titles = (bool)$titles;
     	return $this;
     }
 
