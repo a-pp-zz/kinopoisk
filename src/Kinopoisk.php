@@ -10,7 +10,7 @@ use \AppZz\Http\CurlClient;
  */
 class Kinopoisk {
 
-    const YA_CDN_HOST = 'st.kp.yandex.net';
+    const YA_CDN_HOST = 'avatars.mds.yandex.net';
 
     protected $_timeout = 15;
     protected $_proxy   = false;

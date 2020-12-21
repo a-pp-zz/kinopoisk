@@ -267,13 +267,13 @@ class Parser extends Kinopoisk {
 				break;
 
 				case 'picshots':
-					$pat = '#('.Kinopoisk::YA_CDN_HOST.'\/images\/kadr\/([\w\-_]+)\.(jpg|jpeg|png|gif))#iu';
+					$ya_cdn_host = str_replace ('.', '\.', Kinopoisk::YA_CDN_HOST);
+					$pat = '#('.$ya_cdn_host.')([\w\-\_\/]+)#iu';
+					//$pat = '#('.Kinopoisk::YA_CDN_HOST.'\/images\/kadr\/([\w\-_]+)\.(jpg|jpeg|png|gif))#iu';
 					foreach ($value as &$image) {
 
 						if (preg_match($pat, $image, $parts)) {
-							$image = 'https://' . $parts[1];
-							$thumb = $image;
-							$image = str_replace ('sm_', '', $image);
+							$image = $thumb = 'https://' . rtrim ($parts[1].$parts[2], '/') . '/orig';
 							$fi = new FastImage ($image);
 							$size = $fi->get_size ();
 
