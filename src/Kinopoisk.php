@@ -45,6 +45,11 @@ class Kinopoisk {
         return Kinopoisk::factory('Rating', $this->_kpid);
     }
 
+    public function api ()
+    {
+        return Kinopoisk::factory('Api', $this->_kpid);
+    }
+
     public function timeout ($timeout)
     {
         $this->_timeout = intval ($timeout);
