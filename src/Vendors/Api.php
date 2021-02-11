@@ -198,6 +198,7 @@ class Api extends Kinopoisk {
 
 				case 'frames':
 					$pop_key = 'picshots';
+					$value = array_splice ($value, 0, 5);
 					foreach ($value as &$image) {
 						$image_url = Arr::get ($image, 'image');
 						$preview_url = Arr::get ($image, 'preview');
