@@ -6,19 +6,58 @@ use \AppZz\Http\CurlClient;
 /**
  * @package Kinopoisk
  * @author CoolSwitcher
- * @version 3.0.0
+ * @version 3.1.0
  */
 class Kinopoisk {
-
-    const YA_CDN_HOST = 'avatars.mds.yandex.net';
 
     protected $_timeout = 15;
     protected $_proxy   = false;
     protected $_kpid;
-    protected $_url_tpl;
-    protected $_url;
-    protected $_output;
+
+    protected $_agent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 10_0 like Mac OS X) AppleWebKit/602.1.38 (KHTML, like Gecko) Version/10.0 Mobile/14A5297c Safari/602.1';
+    /**
+     * Referer
+     * @var string
+     */
+    protected $_referer = 'https://www.kinopoisk.ru/';
+
+    /**
+     * Contnent type html|json
+     * @var string
+     */
+    protected $_content_type = 'html';
+
+    /**
+     * Headers
+     * @var array
+     */
+    protected $_headers = array ();
+
     protected $_force   = false;
+
+    /**
+     * Labels
+     * @var array
+     */
+    protected $_labels = array (
+        'kp_id'       => 'ID КП',
+        'name'        => 'Название',
+        'original'    => 'Оригинальное название',
+        'description' => 'Аннотация',
+        'year'        => 'Год',
+        'genre'       => 'Жанр',
+        'country'     => 'Страна',
+        'duration'    => 'Хронометраж',
+        'rating_kp'   => 'Рейтинг КП',
+        'rating_imdb' => 'Рейтинг IMDB',
+        'actors'      => 'Актеры',
+        'director'    => 'Режиссер',
+        'producer'    => 'Продюсер',
+        'poster'      => 'Постер',
+        'picshots'    => 'Кадры'
+    );
+
+    protected $_result;
 
     public function __construct ($kpid = null)
     {
@@ -68,36 +107,127 @@ class Kinopoisk {
         return $this;
     }
 
-    public function output ($output)
-    {
-        $this->_output = $output;
-        return $this;
-    }
-
     public function force ($force = true)
     {
         $this->_force = $force;
         return $this;
     }
 
-    protected function _set_url ()
+    public function labels (array $labels = array ())
     {
-        if ($this->_kpid) {
-            $this->_url = sprintf ($this->_url_tpl, $this->_kpid);
-        }
-
+        $this->_labels = array_merge ($this->_labels, $labels);
         return $this;
     }
 
-    protected function _get_url ($url = NULL)
+    public function destruct ()
     {
-        if (empty($url)) {
-            $url = $this->_url;
+        unset ($this->_result);
+    }
+
+    public static function duration_format ($duration, $after = [], $show_seconds = FALSE)
+    {
+        $duration = intval ($duration);
+
+        if ($duration < 60)
+        {
+            $show_seconds = TRUE;
         }
 
-        $request = CurlClient::get($url, array ('force-version'=>'touch'));
+        if ($duration)
+        {
+            $hh = $mm = $ss = 0;
+            $after = (array) $after;
+            $after_hh = Arr::get ($after, 'hh', ':');
+            $after_mm = Arr::get ($after, 'mm', ':');
+            $after_ss = Arr::get ($after, 'ss', '');
+
+            if ($duration >= 3600)
+            {
+                $hh = intval($duration / 3600);
+                $duration -= ($hh * 3600);
+            }
+
+            if ($duration >= 60)
+            {
+                $mm = intval($duration / 60);
+                $ss = $duration - ($mm * 60);
+            }
+            else
+            {
+                $mm = 0;
+                $ss = $duration;
+            }
+
+            $fmt = '<hour><after_hour><min><after_min><sec><after_sec>';
+
+            $srch = ['<hour>', '<after_hour>', '<min>', '<after_min>', '<sec>', '<after_sec>'];
+            $repl = ['', '', sprintf ('%02d', $mm), $after_mm, '', ''];
+
+            if ($show_seconds)
+            {
+                $repl[4] = sprintf ('%02d', $ss);
+                $repl[5] = $after_ss;
+            }
+            elseif ($repl[3] == ':')
+            {
+                $repl[3] = '';
+            }
+
+            if ($hh OR $after_hh == ':')
+            {
+                $repl[0] = sprintf ('%01d', $hh);
+                $repl[1] = $after_hh;
+            }
+
+            return str_replace ($srch, $repl, $fmt);
+        }
+
+        return FALSE;
+    }
+
+    public static function array_pluck ($array, $key)
+    {
+        $values = [];
+
+        foreach ($array as $row)
+        {
+            if (isset($row[$key]))
+            {
+                $values[] = $row[$key];
+            }
+        }
+
+        return $values;
+    }
+
+    public static function cdn_image_size ($url)
+    {
+        $sizes = array (0, 0);
+
+        if (preg_match('#\/(\d{3,4}x\d{3,4})$#iu', $url, $parts)) {
+            $sizes = explode ('x', $parts[1]);
+        }
+
+        return $sizes;
+    }
+
+    /**
+     * Make request via CurlClient
+     * @param  string $url
+     * @return mixed
+     */
+    protected function _request ($url = NULL)
+    {
+        $request = CurlClient::get($url);
         $request->agent($this->_agent);
-        $request->referer('https://www.kinopoisk.ru/');
+
+        if ( ! empty ($this->_referer)) {
+            $request->referer($this->_referer);
+        }
+
+        if ( ! empty ($this->_headers)) {
+            $request->add_headers ($this->_headers);
+        }
 
         if ($this->_proxy) {
             $proxy_host = Arr::get ($this->_proxy, 'host');
@@ -105,46 +235,36 @@ class Kinopoisk {
             $request->proxy ($proxy_host, $this->_proxy);
         }
 
-        $request->accept('html', 'gzip', 'ru-RU');
+        $request->accept($this->_content_type, 'gzip', 'ru-RU');
 
-        $cookie_file = sys_get_temp_dir() . DIRECTORY_SEPARATOR . sprintf ('kinopoisk-%s.ru.txt', uniqid(true));
-        $request->cookie_file($cookie_file);
+        //$cookie_file = sys_get_temp_dir() . DIRECTORY_SEPARATOR . sprintf ('kinopoisk-%s.ru.txt', uniqid(true));
+        //$request->cookie_file($cookie_file);
         $response = $request->send();
 
         if ($response !== 200) {
-            $this->_error ('Ошибка получения данных c КП', $response);
+            $this->_error ('Ошибка получения данных ['.$url.']', $response);
         }
 
         $body = $request->get_body();
-        $headers = $request->get_headers();
+        //$headers = $request->get_headers();
 
         if (empty($body)) {
-            $this->_error ('Пустой исходный код страницы', 1001);
+            $this->_error ('Пустой ответ ['.$url.']', 1001);
         }
 
-        unlink($cookie_file);
+        //unlink($cookie_file);
 
         return $body;
     }
 
-    public function _check_poster ($url)
+    protected function _get_rating ()
     {
-        $request = CurlClient::head($url, array (), array (), array ('CURLOPT_FOLLOWLOCATION'=>FALSE));
-        $request->agent('chrome');
-        $request->referer('https://www.kinopoisk.ru/');
-        $request->accept('html', 'gzip', 'ru-RU');
-        $cookie_file = sys_get_temp_dir() . DIRECTORY_SEPARATOR . sprintf ('kinopoisk-%s.ru.txt', uniqid(true));
-        $request->cookie_file($cookie_file);
-        $response = (int)$request->send();
-
-        if ($response >= 300 AND $response <= 310) {
-            $headers = $request->get_headers();
-            $location = Arr::get ($headers, 'location');
-            return (strpos($location, 'no-poster') === false);
-        }
-
-        unlink($cookie_file);
-        return true;
+        $rating             = $this->rating();
+        $rating             = $rating->get_result();
+        $ret                = array ();
+        $ret['rating_kp']   = $rating->kp;
+        $ret['rating_imdb'] = $rating->imdb;
+        return $ret;
     }
 
     protected function _error ($message, $code = 0)

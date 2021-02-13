@@ -18,55 +18,16 @@ class Api extends Kinopoisk {
 	const API_FILMS_ENDPOINT = '/api/v%s/films/%d';
 	const API_FRAMES_ENDPOINT = '/api/v%s/films/%d/frames';
 
-	protected $_fields = array (
-		'kp_id'       => 'ID КП',
-		'name'        => 'Название',
-		'original'    => 'Оригинальное название',
-		'description' => 'Аннотация',
-		'year'        => 'Год',
-		'genre'       => 'Жанр',
-		'country'     => 'Страна',
-		'duration'    => 'Хронометраж',
-		'rating_kp'   => 'Рейтинг КП',
-		'rating_imdb' => 'Рейтинг IMDB',
-		'actors'      => 'Актеры',
-		'director'    => 'Режиссер',
-		'producer'    => 'Продюсер',
-		'poster'      => 'Постер',
-		'picshots'    => 'Кадры'
-	);
-
-	protected $_agent   = 'Mozilla/5.0 (iPhone; CPU iPhone OS 10_0 like Mac OS X) AppleWebKit/602.1.38 (KHTML, like Gecko) Version/10.0 Mobile/14A5297c Safari/602.1';
-
-	protected $_titles  = false;
+	protected $_data = array ();
+	protected $_frames = array ();
+	protected $_rating = array ();
+	protected $_referer = '';
+	protected $_content_type = 'json';
 	protected $_version = '2.1';
-	protected $_api_key;
-	protected $_result;
-
-	private $_data;
-	private $_frames;
 
     public function __construct ($kpid = null)
     {
     	parent::__construct ($kpid);
-    	$this->_set_url ();
-    }
-
-    public function destruct ()
-    {
-    	$this->_result = null;
-    }
-
-    public function fields (array $fields = array ())
-    {
-    	$this->_fields = $fields;
-    	return $this;
-    }
-
-    public function titles ($titles = true)
-    {
-    	$this->_titles = (bool)$titles;
-    	return $this;
     }
 
     public function version ($version = '2.1')
@@ -77,23 +38,49 @@ class Api extends Kinopoisk {
 
     public function api_key ($key = '')
     {
-    	$this->_api_key = $key;
+    	$this->_headers = array (
+    		'X-API-KEY' => $key
+    	);
     	return $this;
     }
 
 	public function get_data ()
 	{
-		$this->_data = $this->_request (Api::API_FILMS_ENDPOINT);
+		$url = Api::API_HOST.sprintf (Api::API_FILMS_ENDPOINT, $this->_version, $this->_kpid);
+		$this->_data = $this->_request ($url);
+
+		if (is_object($this->_data)) {
+			$this->_data = (array)json_decode(json_encode($this->_data), true);
+			$this->_data = Arr::get ($this->_data, 'data');
+		}
+
 		return ! empty ($this->_data);
 	}
 
-	public function get_frames ()
+	public function get_frames ($max = 5)
 	{
-		$this->_frames = $this->_request (Api::API_FRAMES_ENDPOINT);
+		$url = Api::API_HOST.sprintf (Api::API_FRAMES_ENDPOINT, $this->_version, $this->_kpid);
+		$this->_frames = $this->_request ($url);
+
+		if (is_object($this->_frames)) {
+			$this->_frames = (array)json_decode(json_encode($this->_frames), true);
+			$this->_frames = (array)Arr::get ($this->_frames, 'frames');
+
+			if ($max AND ! empty ($this->_frames)) {
+				$this->_frames = array_slice ($this->_frames, 0, $max);
+			}
+		}
+
 		return ! empty ($this->_frames);
 	}
 
-	public function get ()
+	public function get_rating ()
+	{
+		$this->_rating = $this->_get_rating();
+		return true;
+	}
+
+	public function get_result ()
 	{
 		$this->_populate();
 		return $this->_result;
@@ -112,42 +99,20 @@ class Api extends Kinopoisk {
 
 	private function _populate ()
 	{
-		$this->_result = array ();
+		$this->_result = (array)$this->_data;
+		$this->_frames = (array)$this->_frames;
 
-		if (is_object($this->_data)) {
-			$this->_result = (array)json_decode(json_encode($this->_data), true);
-			$this->_result = Arr::get ($this->_result, 'data');
-			unset ($this->_data);
+		if ( ! empty ($this->_frames)) {
+			$this->_result['frames'] = $this->_frames;
 		}
 
-		if (is_object($this->_frames)) {
-			$this->_frames = (array)json_decode(json_encode($this->_frames), true);
-			$this->_frames = Arr::get ($this->_frames, 'frames');
-
-			if ( ! empty ($this->_frames)) {
-				$this->_result['frames'] = $this->_frames;
-				unset ($this->_frames);
-			}
+		if ( ! empty ($this->_rating)) {
+			$this->_result = array_merge ($this->_result, $this->_rating);
 		}
 
-		if ( ! empty ($this->_result)) {
-
-			$check_str = '';
-
-			foreach ($this->_result as $value) {
-				if ( ! is_array($value)) {
-					$check_str .= $value;
-				}
-			}
-
-			if (empty ($check_str)) {
-				$this->_result = false;
-				return $this;
-			}
-		} else {
-			$this->_result = false;
-			return $this;
-		}
+		unset ($this->_data);
+		unset ($this->_frames);
+		unset ($this->_rating);
 
 		foreach ($this->_result as $key=>&$value) {
 
@@ -178,6 +143,8 @@ class Api extends Kinopoisk {
 
 				case 'description':
 				case 'year':
+				case 'rating_kp':
+				case 'rating_imdb':
 					$pop_key = $key;
 				break;
 
@@ -225,43 +192,11 @@ class Api extends Kinopoisk {
 			}
 
 			if ($pop_key) {
-				if ($this->_titles) {
-					$value = array ('field'=>$pop_key, 'title'=>Arr::get($this->_fields, $pop_key, ''), 'value'=>$value);
-				}
 				$populated[$pop_key] = $value;
 			}
-		}
-
-		if ($this->_titles) {
-			$populated = array_values ($populated);
 		}
 
 		$this->_result = $populated;
 		unset ($populated);
 	}
-
-    protected function _request ($url = NULL)
-    {
-    	$url = Api::API_HOST.sprintf ($url, $this->_version, $this->_kpid);
-
-        $request = CurlClient::get($url);
-        $request->agent($this->_agent);
-        $request->timeout(10);
-        $request->accept('json', 'gzip', 'ru-RU');
-        $request->add_header('X-API-KEY', $this->_api_key);
-        $response = $request->send();
-
-        if ($response !== 200) {
-            $this->_error ('Ошибка получения данных c Api', $response);
-        }
-
-        $body = $request->get_body();
-        $headers = $request->get_headers();
-
-        if (empty($body)) {
-            $this->_error ('Пустой ответ', 1001);
-        }
-
-        return $body;
-    }
 }

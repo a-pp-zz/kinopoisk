@@ -2,304 +2,234 @@
 namespace AppZz\Http\Kinopoisk\Vendors;
 use \AppZz\Http\Kinopoisk\Kinopoisk;
 use \AppZz\Helpers\Arr;
-use \AppZz\Helpers\HtmlDomParser;
-use \AppZz\Http\Helpers\FastImage;
 
 /**
- * Mobile version parser
+ * JSON-Data Parser
  * @package Kinopoisk/Parser
  * @author CoolSwitcher
- * @version 5.0.0
+ * @version 5.2.1
  */
 class Parser extends Kinopoisk {
 
-	protected $_url_tpl = 'https://www.kinopoisk.ru/film/%d/';
-	protected $_agent   = 'Mozilla/5.0 (iPhone; CPU iPhone OS 10_0 like Mac OS X) AppleWebKit/602.1.38 (KHTML, like Gecko) Version/10.0 Mobile/14A5297c Safari/602.1';
+	const KP_URL_FILM   = 'https://www.kinopoisk.ru/film/%d/';
+	const KP_URL_STILLS = 'https://www.kinopoisk.ru/film/%d/stills/';
 
-	protected $_fields = array (
-		'kp_id'       => 'ID КП',
-		'name'        => 'Название',
-		'original'    => 'Оригинальное название',
-		'description' => 'Аннотация',
-		'year'        => 'Год',
-		'genre'       => 'Жанр',
-		'country'     => 'Страна',
-		'duration'    => 'Хронометраж',
-		'rating_kp'   => 'Рейтинг КП',
-		'rating_imdb' => 'Рейтинг IMDB',
-		'actors'      => 'Актеры',
-		'director'    => 'Режиссер',
-		'producer'    => 'Продюсер',
-		'poster'      => 'Постер',
-		'picshots'    => 'Кадры'
-	);
-
-	protected $_titles = false;
-	protected $_result;
+	protected $_data = array ();
+	protected $_frames = array ();
+	protected $_rating = array ();
+	protected $_referer = 'https://www.kinopoisk.ru/';
+	protected $_content_type = 'html';
 
     public function __construct ($kpid = null)
     {
     	parent::__construct ($kpid);
-    	$this->_set_url ();
     }
 
-    public function destruct ()
-    {
-    	$this->_result = null;
-    }
-
-    public function fields (array $fields = array ())
-    {
-    	$this->_fields = $fields;
-    	return $this;
-    }
-
-    public function titles ($titles = true)
-    {
-    	$this->_titles = (bool)$titles;
-    	return $this;
-    }
-
-	public function parse ()
+	public function get_data ($cache = false)
 	{
-		if ($this->_output AND is_file ($this->_output) AND $this->_force !== true) {
-			$body = file_get_contents($this->_output);
+		if ($cache AND is_file ($cache) AND $this->_force !== true) {
+			$body = file_get_contents($cache);
 		} else {
-			$body = $this->_get_url ();
-			if ($this->_output) {
-				file_put_contents($this->_output, $body);
+			$url = sprintf (Parser::KP_URL_FILM, $this->_kpid);
+			$body = $this->_request ($url);
+			if ($cache) {
+				file_put_contents($cache, $body);
 			}
 		}
 
-		$this->_parse ($body);
-		$this->_populate();
-
-		return $this->_result;
+		$this->_data = $this->_parse_json ($body);
+		return ! empty ($this->_data);
 	}
 
-	private function _clean_string ($str)
+	public function get_rating ()
 	{
-		$str = trim ($str);
-		$str = preg_replace("#\s{1,}$#iu", "", $str);
-		return $str;
+		$this->_rating = $this->_get_rating();
+		return true;
 	}
 
-	private function _parse ($body)
+    public function get_result ($with_labels = false)
+    {
+        $this->_populate();
+
+        if ($with_labels) {
+            $ret = array ();
+            foreach ($this->_result as $key=>$value) {
+                $ret[] = array ('field'=>$key, 'title'=>Arr::get($this->_labels, $key, ''), 'value'=>$value);
+            }
+            return $ret;
+        }
+
+        return $this->_result;
+    }
+
+	public function get_frames ($max = 0, $cache = false)
 	{
-		$dom = HtmlDomParser::str_get_html($body);
-		$this->_result = array ();
-
-		$titles = array (
-			'name'        => 'h1.movie-header__title',
-			'original'    => 'h2.movie-header__original-title',
-			//'description' => 'p.descr',
-			'year'        => '.movie-header__years',
-			'genre'       => '.movie-header__genres',
-			'country'     => '.movie-header__production',
-			'rating_kp'   => '.details-table .movie-rating__value',
-			'rating_imdb' => '.details-table .details-table__cell_even',
-		);
-
-		foreach ($titles as $key=>$pat) {
-
-			if ( ! array_key_exists($key, $this->_fields)) {
-				continue;
-			}
-
-			$f = $dom->find($pat, 0);
-
-			if ($f) {
-				$this->_result[$key] = $this->_clean_string ($f->plaintext);
-			}
-
-			unset ($f);
-		}
-
-		$f = $dom->find('.movie-page__description div');
-
-		foreach ($f as $d) {
-			if ( ! array_key_exists('description', $this->_fields)) {
-				continue;
-			}
-
-			if (isset ($d->itemprop) AND ($d->itemprop == 'description')) {
-				$this->_result['description'] = $this->_clean_string ($d->content);
-				break;
+		if ($cache AND is_file ($cache) AND $this->_force !== true) {
+			$body = file_get_contents($cache);
+		} else {
+			$url = sprintf (Parser::KP_URL_STILLS, $this->_kpid);
+			$body = $this->_request ($url);
+			if ($cache) {
+				file_put_contents($cache, $body);
 			}
 		}
 
-		unset ($f);
+		$this->_frames = $this->_parse_json ($body);
 
-		$persons = array (
-			'actors'   => '.person-snippet__name',
+		if ( ! empty ($this->_frames)) {
+			$this->_frames = Arr::path ($this->_frames, 'page.images');
+
+			if ($max AND ! empty ($this->_frames)) {
+				$this->_frames = array_slice ($this->_frames, 0, $max);
+			}
+		}
+
+		return ! empty ($this->_frames);
+	}
+
+	private function _parse_json ($body)
+	{
+		$patterns = array (
+			'def' => '#\<script type="application\/(ld\+)?json"([\w\s\-]+)?\>(?<json>.*)\<\/script\>#iu',
 		);
 
-		foreach ($persons as $key=>$pat) {
-			if ( ! array_key_exists('actors', $this->_fields)) {
-				continue;
-			}
+		foreach ($patterns as $pat_id => $pattern) {
+			if (preg_match($pattern, $body, $parts)) {
+				$srch = array (
+					'@<(\w+)\b.*?>.*?<\/\1>@siu',
+					'@<(\w+)\b.*?>@siu',
+					'@<\/\w+>@siu'
+				);
 
-			$f = $dom->find($pat);
+				$repl = array (
+					'',
+					'',
+					''
+				);
 
-			foreach ($f as $item) {
-				if ( ! empty ($item->itemprop) AND in_array ($item->itemprop, array_keys($persons))) {
-					$this->_result[$item->itemprop][] = $this->_clean_string ($item->plaintext);
+				$json = $parts['json'];
+				$json = urldecode($json);
+				$json = preg_replace($srch, $repl, $json);
+				$json = json_decode($json, TRUE);
+
+				if (json_last_error() === JSON_ERROR_NONE) {
+					return $json;
 				}
 			}
 		}
 
-		unset ($f);
-
-		$creators = array (
-			'director', 'producer'
-		);
-
-		$f = $dom->find('.movie-page__qa-creators-container meta');
-
-		foreach ($f as $item) {
-			$creator = $item->itemprop;
-
-			if ( ! array_key_exists($creator, $this->_fields)) {
-				continue;
-			}
-			if ( ! empty ($creator) AND ! empty ($item->content)) {
-				$this->_result[$item->itemprop][] = $this->_clean_string ($item->content);
-			}
-		}
-
-		unset ($f);
-
-		if (array_key_exists('poster', $this->_fields)) {
-			$f = $dom->find('.movie-header__poster-wrap meta');
-
-			foreach ($f as $item) {
-				if (! empty ($item->itemprop) AND $item->itemprop == 'image') {
-					$this->_result['poster'] = $this->_clean_string ($item->content);
-				}
-			}
-
-			unset ($f);
-		}
-
-		if (array_key_exists('picshots', $this->_fields)) {
-			$f = $dom->find('.photo-snippet__picture');
-
-			foreach ($f as $img) {
-				if ( ! empty ($img->style)) {
-					$this->_result['picshots'][] = $this->_clean_string ($img->style);
-				}
-			}
-
-			unset ($f);
-		}
-
-		return $this;
+		return false;
 	}
 
 	private function _populate ()
 	{
-		if ( ! empty ($this->_result)) {
-			$check_str = '';
+		$this->_result = (array)$this->_data;
+		$this->_frames = (array)$this->_frames;
 
-			foreach ($this->_result as $value) {
-				if ( ! is_array($value)) {
-					$check_str .= $value;
-				}
-			}
-
-			if (empty ($check_str)) {
-				$this->_result = false;
-				return $this;
-			}
-		} else {
-			$this->_result = false;
-			return $this;
+		if ( ! empty ($this->_frames)) {
+			$this->_result['frames'] = $this->_frames;
 		}
 
-		if (array_key_exists('kp_id', $this->_fields)) {
-			$this->_result['kp_id'] = $this->_kpid;
+		if ( ! empty ($this->_rating)) {
+			$this->_result = array_merge ($this->_result, $this->_rating);
 		}
+
+		unset ($this->_data);
+		unset ($this->_frames);
+		unset ($this->_rating);
+
+		$this->_result['kp_id'] = $this->_kpid;
 
 		foreach ($this->_result as $key=>&$value) {
+
 			switch ($key) {
-				case 'country':
-					$values = explode (',', $value);
-
-					if ( ! empty ($values) AND count ($values) > 1) {
-						$values = array_map ('trim', $values);
-						$duration = array_pop ($values);
-
-						if (array_key_exists('duration', $this->_fields)) {
-							$this->_result['duration'] = $duration;
-						}
-
-						$value = implode (', ', $values);
-					}
+				case 'datePublished':
+					$pop_key = 'year';
 				break;
 
+				case 'genre':
+				case 'countryOfOrigin':
+					$value = ( ! empty ($value) AND is_array ($value)) ? implode (', ', $value) : '';
+					$pop_key = $key == 'countryOfOrigin' ? 'country' : 'genre';
+				break;
+
+				case 'datePublished':
+					$pop_key = 'duration';
+				break;
+
+				case 'alternateName':
+					$pop_key = 'original';
+				break;
+
+				case 'timeRequired':
+					$value = Kinopoisk::duration_format ($value*60);
+					$pop_key = 'duration';
+				break;
+
+				case 'actor':
 				case 'director':
-				case 'actors':
-				case 'producer':
-					$value = implode (', ', $value);
+					$value = ( ! empty ($value) AND is_array ($value)) ? Kinopoisk::array_pluck ($value, 'name') : '';
+					$value = ( ! empty ($value) AND is_array ($value)) ? implode (', ', $value) : '';
+					$pop_key = $key == 'actor' ? 'actors' : 'director';
 				break;
 
+				case 'name':
+				case 'description':
+				case 'year':
+				case 'kp_id':
 				case 'rating_kp':
 				case 'rating_imdb':
-					$value = (float)$value;
+					$pop_key = $key;
 				break;
 
-				case 'poster':
-					if ($this->_check_poster ($value)) {
-						$fi = new FastImage ($value);
-						$size = $fi->get_size ();
+				case 'image':
+					$pop_key = 'poster';
+					$value = preg_replace ('#^\/\/#', 'https://', $value);
+					$size = Kinopoisk::cdn_image_size ($value);
 
-						if (is_array($size) AND count ($size) === 2) {
-							list ($width, $height) = $size;
-						} else {
-							$width = $height = 0;
-						}
-
-						$value = array ('image'=>$value, 'width'=>$width, 'height'=>$height);
-						unset($fi);
+					if (is_array($size) AND count ($size) === 2) {
+						list ($width, $height) = $size;
 					} else {
-						unset ($this->_result['poster']);
+						$width = $height = 0;
 					}
+
+					$value = array ('image'=>$value, 'width'=>$width, 'height'=>$height);
 				break;
 
-				case 'picshots':
-					$ya_cdn_host = str_replace ('.', '\.', Kinopoisk::YA_CDN_HOST);
-					$pat = '#('.$ya_cdn_host.')([\w\-\_\/]+)#iu';
-					//$pat = '#('.Kinopoisk::YA_CDN_HOST.'\/images\/kadr\/([\w\-_]+)\.(jpg|jpeg|png|gif))#iu';
-					foreach ($value as &$image) {
+				case 'frames':
+					$pop_key = 'picshots';
+					$value = Kinopoisk::array_pluck ($value, 'baseUrl');
 
-						if (preg_match($pat, $image, $parts)) {
-							$image = $thumb = 'https://' . rtrim ($parts[1].$parts[2], '/') . '/orig';
-							$fi = new FastImage ($image);
-							$size = $fi->get_size ();
+					if ( ! empty ($value)) {
+						foreach ($value as &$image) {
+
+							$size = Kinopoisk::cdn_image_size ($image);
+							$thumb = $image;
 
 							if (is_array($size) AND count ($size) === 2) {
 								list ($width, $height) = $size;
+								$thumb = str_replace ($width.'x'.$height, '200x200', $image);
 							} else {
 								$width = $height = 0;
 							}
 
-							unset($fi);
-
 							$image = array ('image'=>$image, 'thumb'=>$thumb, 'width'=>$width, 'height'=>$height);
-						} else {
-							continue;
 						}
 					}
 				break;
+
+				default:
+					$pop_key = null;
+				break;
 			}
 
-			if ($this->_titles) {
-				$value = array ('field'=>$key, 'title'=>Arr::get($this->_fields, $key, ''), 'value'=>$value);
+			if ($pop_key) {
+				$populated[$pop_key] = $value;
 			}
 		}
 
-		if ($this->_titles) {
-			$this->_result = array_values ($this->_result);
-		}
+		$this->_result = $populated;
+		unset ($populated);
+		return true;
 	}
 }
