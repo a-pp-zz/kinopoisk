@@ -7,16 +7,13 @@ use \AppZz\Helpers\Arr;
  * JSON-Data Parser
  * @package Kinopoisk/Parser
  * @author CoolSwitcher
- * @version 5.2.1
+ * @version 5.2.2
  */
 class Parser extends Kinopoisk {
 
 	const KP_URL_FILM   = 'https://www.kinopoisk.ru/film/%d/';
 	const KP_URL_STILLS = 'https://www.kinopoisk.ru/film/%d/stills/';
 
-	protected $_data = array ();
-	protected $_frames = array ();
-	protected $_rating = array ();
 	protected $_referer = 'https://www.kinopoisk.ru/';
 	protected $_content_type = 'html';
 
@@ -44,23 +41,8 @@ class Parser extends Kinopoisk {
 	public function get_rating ()
 	{
 		$this->_rating = $this->_get_rating();
-		return true;
+		return ! empty ($this->_rating);
 	}
-
-    public function get_result ($with_labels = false)
-    {
-        $this->_populate();
-
-        if ($with_labels) {
-            $ret = array ();
-            foreach ($this->_result as $key=>$value) {
-                $ret[] = array ('field'=>$key, 'title'=>Arr::get($this->_labels, $key, ''), 'value'=>$value);
-            }
-            return $ret;
-        }
-
-        return $this->_result;
-    }
 
 	public function get_frames ($max = 0, $cache = false)
 	{
@@ -121,7 +103,7 @@ class Parser extends Kinopoisk {
 		return false;
 	}
 
-	private function _populate ()
+	protected function _populate ()
 	{
 		$this->_result = (array)$this->_data;
 		$this->_frames = (array)$this->_frames;

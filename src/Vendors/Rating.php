@@ -3,7 +3,7 @@
  * Get XML Rating
  * @package Kinopoisk/Rating
  * @author CoolSwitcher
- * @version 3.0.1
+ * @version 3.0.3
  */
 namespace AppZz\Http\Kinopoisk\Vendors;
 use AppZz\Helpers\Arr;
@@ -19,13 +19,28 @@ class Rating extends Kinopoisk {
         parent::__construct ($kpid);
     }
 
-    public function get_result ()
+    public function get_data ($cache = false)
+    {
+        $this->_error ('Not implemnted', 0);
+    }
+
+    public function get_frames ($max = 0, $cache = false)
+    {
+        $this->_error ('Not implemnted', 0);
+    }
+
+    public function get_rating ($with_labels = false)
     {
         $url = sprintf (Rating::KP_URL_RATING, $this->_kpid);
-        $data = (array)$this->_request ($url);
-        $ret = new \stdClass;
-        $ret->kp = Arr::get($data, 'kp_rating', 0);
-        $ret->imdb = Arr::get($data, 'imdb_rating', 0);
-        return $ret;
+        $this->_rating = (array)$this->_request ($url);
+        return ! empty ($this->_rating);
+    }
+
+    protected function _populate ()
+    {
+        $this->_result['rating_kp'] = Arr::get($this->_rating, 'kp_rating', 0);
+        $this->_result['rating_imdb'] = Arr::get($this->_rating, 'imdb_rating', 0);
+        unset ($this->_rating);
+        return $this;
     }
 }

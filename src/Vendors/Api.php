@@ -6,11 +6,11 @@ use \AppZz\Http\CurlClient;
 use \AppZz\Http\Helpers\FastImage;
 
 /**
- * Unofficial API Parser
+ * Unofficial API Wrapper
  * @link https://kinopoiskapiunofficial.tech
  * @package Kinopoisk/Api
  * @author CoolSwitcher
- * @version 1.0.0
+ * @version 1.0.1
  */
 class Api extends Kinopoisk {
 
@@ -18,9 +18,6 @@ class Api extends Kinopoisk {
 	const API_FILMS_ENDPOINT = '/api/v%s/films/%d';
 	const API_FRAMES_ENDPOINT = '/api/v%s/films/%d/frames';
 
-	protected $_data = array ();
-	protected $_frames = array ();
-	protected $_rating = array ();
 	protected $_referer = '';
 	protected $_content_type = 'json';
 	protected $_version = '2.1';
@@ -44,7 +41,7 @@ class Api extends Kinopoisk {
     	return $this;
     }
 
-	public function get_data ()
+	public function get_data ($cache = false)
 	{
 		$url = Api::API_HOST.sprintf (Api::API_FILMS_ENDPOINT, $this->_version, $this->_kpid);
 		$this->_data = $this->_request ($url);
@@ -57,7 +54,7 @@ class Api extends Kinopoisk {
 		return ! empty ($this->_data);
 	}
 
-	public function get_frames ($max = 5)
+	public function get_frames ($max = 5, $cache = false)
 	{
 		$url = Api::API_HOST.sprintf (Api::API_FRAMES_ENDPOINT, $this->_version, $this->_kpid);
 		$this->_frames = $this->_request ($url);
@@ -77,13 +74,7 @@ class Api extends Kinopoisk {
 	public function get_rating ()
 	{
 		$this->_rating = $this->_get_rating();
-		return true;
-	}
-
-	public function get_result ()
-	{
-		$this->_populate();
-		return $this->_result;
+		return ! empty ($this->_rating);
 	}
 
 	private function _implode_arrays ($array = array (), $sep = ', ')
@@ -97,7 +88,7 @@ class Api extends Kinopoisk {
 		return implode ($sep, $array);
 	}
 
-	private function _populate ()
+	protected function _populate ()
 	{
 		$this->_result = (array)$this->_data;
 		$this->_frames = (array)$this->_frames;

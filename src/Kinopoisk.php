@@ -8,13 +8,32 @@ use \AppZz\Http\CurlClient;
  * @author CoolSwitcher
  * @version 3.1.0
  */
-class Kinopoisk {
+abstract class Kinopoisk {
 
-    protected $_timeout = 15;
-    protected $_proxy   = false;
+    /**
+     * Kinopoisk ID
+     * @var integer
+     */
     protected $_kpid;
 
+    /**
+     * Curl timeout
+     * @var integer
+     */
+    protected $_timeout = 15;
+
+    /**
+     * CurlClient proxy params
+     * @var false|array
+     */
+    protected $_proxy   = false;
+
+    /**
+     * UserAgent
+     * @var string
+     */
     protected $_agent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 10_0 like Mac OS X) AppleWebKit/602.1.38 (KHTML, like Gecko) Version/10.0 Mobile/14A5297c Safari/602.1';
+
     /**
      * Referer
      * @var string
@@ -28,11 +47,15 @@ class Kinopoisk {
     protected $_content_type = 'html';
 
     /**
-     * Headers
+     * CurlClient Headers
      * @var array
      */
     protected $_headers = array ();
 
+    /**
+     * Force query avoiding cache
+     * @var boolean
+     */
     protected $_force   = false;
 
     /**
@@ -57,36 +80,65 @@ class Kinopoisk {
         'picshots'    => 'Кадры'
     );
 
+    /**
+     * Populated result holder
+     * @var mixed
+     */
     protected $_result;
 
-    public function __construct ($kpid = null)
+    /**
+     * Temp film data holder
+     * @var mixed
+     */
+    protected $_data = array ();
+
+    /**
+     * Temp film frames holder
+     * @var mixed
+     */
+    protected $_frames = array ();
+
+    /**
+     * Temp rating data holder
+     * @var mixed
+     */
+    protected $_rating = array ();
+
+    protected function __construct ($kpid = null)
     {
         $kpid = intval ($kpid);
 
         if ( ! empty ($kpid)) {
             $this->_kpid = $kpid;
+        } else {
+            $this->_error ('Wrong kpid', 0);
         }
     }
 
     public static function factory ($vendor, $kpid = null)
     {
         $vendor = '\AppZz\Http\Kinopoisk\Vendors\\' . $vendor;
-        return new $vendor($kpid);
+
+        if ( ! class_exists($vendor)) {
+            $this->_error ('Vendor '.$vendor.' not exists', 0);
+        }
+
+        return new $vendor ($kpid);
     }
 
-    public function parser ()
+    public static function parser ($kpid = null)
     {
-        return Kinopoisk::factory('Parser', $this->_kpid);
+        return Kinopoisk::factory('Parser', $kpid);
     }
 
-    public function rating ()
+    public static function rating ($kpid = null)
     {
-        return Kinopoisk::factory('Rating', $this->_kpid);
+        return Kinopoisk::factory('Rating', $kpid);
     }
 
-    public function api ()
+    public static function api ($kpid = null)
     {
-        return Kinopoisk::factory('Api', $this->_kpid);
+        return Kinopoisk::factory('Api', $kpid);
     }
 
     public function timeout ($timeout)
@@ -123,6 +175,25 @@ class Kinopoisk {
     {
         unset ($this->_result);
     }
+
+    public function get_result ($with_labels = false)
+    {
+        $this->_populate();
+
+        if ($with_labels) {
+            $ret = array ();
+            foreach ($this->_result as $key=>$value) {
+                $ret[] = array ('field'=>$key, 'title'=>Arr::get($this->_labels, $key, ''), 'value'=>$value);
+            }
+            return $ret;
+        }
+
+        return $this->_result;
+    }
+
+    abstract public function get_data ($cache);
+    abstract public function get_frames ($max = 5, $cache = false);
+    abstract public function get_rating ();
 
     public static function duration_format ($duration, $after = [], $show_seconds = FALSE)
     {
@@ -200,6 +271,11 @@ class Kinopoisk {
         return $values;
     }
 
+    /**
+     * Get image sizes from yandex cdn url
+     * @param  string $url yandex cdn url
+     * @return array
+     */
     public static function cdn_image_size ($url)
     {
         $sizes = array (0, 0);
@@ -237,8 +313,6 @@ class Kinopoisk {
 
         $request->accept($this->_content_type, 'gzip', 'ru-RU');
 
-        //$cookie_file = sys_get_temp_dir() . DIRECTORY_SEPARATOR . sprintf ('kinopoisk-%s.ru.txt', uniqid(true));
-        //$request->cookie_file($cookie_file);
         $response = $request->send();
 
         if ($response !== 200) {
@@ -246,25 +320,21 @@ class Kinopoisk {
         }
 
         $body = $request->get_body();
-        //$headers = $request->get_headers();
 
         if (empty($body)) {
             $this->_error ('Пустой ответ ['.$url.']', 1001);
         }
 
-        //unlink($cookie_file);
-
         return $body;
     }
 
+    abstract protected function _populate ();
+
     protected function _get_rating ()
     {
-        $rating             = $this->rating();
-        $rating             = $rating->get_result();
-        $ret                = array ();
-        $ret['rating_kp']   = $rating->kp;
-        $ret['rating_imdb'] = $rating->imdb;
-        return $ret;
+        $rating = Kinopoisk::rating ($this->_kpid);
+        $rating->get_rating();
+        return $rating->get_result ();
     }
 
     protected function _error ($message, $code = 0)
