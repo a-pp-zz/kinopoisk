@@ -195,7 +195,7 @@ abstract class Kinopoisk {
     abstract public function get_frames ($max = 5, $cache = false);
     abstract public function get_rating ();
 
-    public static function duration_format ($duration, $after = [], $show_seconds = FALSE)
+    public static function duration_format ($duration, $after = array (), $show_seconds = FALSE)
     {
         $duration = intval ($duration);
 
@@ -231,8 +231,8 @@ abstract class Kinopoisk {
 
             $fmt = '<hour><after_hour><min><after_min><sec><after_sec>';
 
-            $srch = ['<hour>', '<after_hour>', '<min>', '<after_min>', '<sec>', '<after_sec>'];
-            $repl = ['', '', sprintf ('%02d', $mm), $after_mm, '', ''];
+            $srch = array ('<hour>', '<after_hour>', '<min>', '<after_min>', '<sec>', '<after_sec>');
+            $repl = array ('', '', sprintf ('%02d', $mm), $after_mm, '', '');
 
             if ($show_seconds)
             {
@@ -258,7 +258,7 @@ abstract class Kinopoisk {
 
     public static function array_pluck ($array, $key)
     {
-        $values = [];
+        $values = array ();
 
         foreach ($array as $row)
         {
