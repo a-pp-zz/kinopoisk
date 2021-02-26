@@ -14,13 +14,15 @@ use \AppZz\Http\Helpers\FastImage;
  */
 class Api extends Kinopoisk {
 
-	const API_HOST = 'https://kinopoiskapiunofficial.tech';
-	const API_FILMS_ENDPOINT = '/api/v%s/films/%d';
+	const API_HOST            = 'https://kinopoiskapiunofficial.tech';
+	const API_FILMS_ENDPOINT  = '/api/v%s/films/%d';
 	const API_FRAMES_ENDPOINT = '/api/v%s/films/%d/frames';
+	const API_STAFF_ENDPOINT  = '/api/v1/staff';
 
 	protected $_referer = '';
 	protected $_content_type = 'json';
 	protected $_version = '2.1';
+	protected $_staff;
 
     public function __construct ($kpid = null)
     {
@@ -71,6 +73,37 @@ class Api extends Kinopoisk {
 		return ! empty ($this->_frames);
 	}
 
+	public function get_staff ($max = 10, $cache = false)
+	{
+		$url = Api::API_HOST.Api::API_STAFF_ENDPOINT.'?'.http_build_query (array('filmId'=>$this->_kpid));
+		$staff = $this->_request ($url);
+
+		if ($staff) {
+			$this->_staff = array ();
+			$staff = (array)json_decode(json_encode($staff), true);
+
+			foreach ($staff as $values) {
+				$key  = mb_strtolower(Arr::get ($values, 'professionKey'));
+				$name = Arr::get ($values, 'nameRu');
+
+				if (in_array ($key, array ('director', 'actor'))) {
+					$this->_staff[$key][] = $name;
+				}
+			}
+
+			unset ($staff);
+			unset ($values);
+
+			if ( ! empty ($this->_staff)) {
+				foreach ($this->_staff as &$values) {
+					$values = array_slice ($values, 0, $max);
+				}
+			}
+		}
+
+		return ! empty ($this->_staff);
+	}
+
 	public function get_rating ()
 	{
 		$this->_rating = $this->_get_rating();
@@ -88,6 +121,15 @@ class Api extends Kinopoisk {
 		return implode ($sep, $array);
 	}
 
+	private function _clean_picshot_url ($url)
+	{
+		if (preg_match ('#(https\:\/\/avatars\.mds\.yandex\.net)(.*)#iu', $url, $parts)) {
+			$url = $parts[1].$parts[2];
+		}
+
+		return $url;
+	}
+
 	protected function _populate ()
 	{
 		$this->_result = (array)$this->_data;
@@ -101,9 +143,16 @@ class Api extends Kinopoisk {
 			$this->_result = array_merge ($this->_result, $this->_rating);
 		}
 
+		if ( ! empty ($this->_staff)) {
+			$this->_result = array_merge ($this->_result, $this->_staff);
+		}
+
 		unset ($this->_data);
 		unset ($this->_frames);
 		unset ($this->_rating);
+		unset ($this->_staff);
+
+		$populated = array ();
 
 		foreach ($this->_result as $key=>&$value) {
 
@@ -139,8 +188,15 @@ class Api extends Kinopoisk {
 					$pop_key = $key;
 				break;
 
+				case 'director':
+				case 'actor':
+					$pop_key = $key == 'actor' ? $key.'s' : $key;
+					$value = ( ! empty ($value) AND is_array ($value)) ? implode (', ', $value) : '';
+				break;
+
 				case 'posterUrl':
 					$pop_key = 'poster';
+					$value = $this->_clean_picshot_url ($value);
 					$fi = new FastImage ($value);
 					$size = $fi->get_size ();
 
@@ -160,6 +216,9 @@ class Api extends Kinopoisk {
 					foreach ($value as &$image) {
 						$image_url = Arr::get ($image, 'image');
 						$preview_url = Arr::get ($image, 'preview');
+
+						$image_url = $this->_clean_picshot_url ($image_url);
+						$preview_url = $this->_clean_picshot_url ($preview_url);
 
 						if ( ! empty ($image_url)) {
 							$fi = new FastImage ($image['image']);

@@ -69,6 +69,11 @@ class Parser extends Kinopoisk {
 		return ! empty ($this->_frames);
 	}
 
+    public function get_staff ($max = 0, $cache = false)
+    {
+        return false;
+    }
+
 	private function _parse_json ($body)
 	{
 		$patterns = array (
@@ -121,6 +126,7 @@ class Parser extends Kinopoisk {
 		unset ($this->_rating);
 
 		$this->_result['kp_id'] = $this->_kpid;
+		$populated = array ();
 
 		foreach ($this->_result as $key=>&$value) {
 

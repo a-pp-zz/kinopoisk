@@ -193,6 +193,7 @@ abstract class Kinopoisk {
 
     abstract public function get_data ($cache);
     abstract public function get_frames ($max = 5, $cache = false);
+    abstract public function get_staff ($max = 10, $cache = false);
     abstract public function get_rating ();
 
     public static function duration_format ($duration, $after = array (), $show_seconds = FALSE)

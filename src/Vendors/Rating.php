@@ -21,12 +21,17 @@ class Rating extends Kinopoisk {
 
     public function get_data ($cache = false)
     {
-        $this->_error ('Not implemnted', 0);
+        return false;
     }
 
     public function get_frames ($max = 0, $cache = false)
     {
-        $this->_error ('Not implemnted', 0);
+        return false;
+    }
+
+    public function get_staff ($max = 0, $cache = false)
+    {
+        return false;
     }
 
     public function get_rating ($with_labels = false)
