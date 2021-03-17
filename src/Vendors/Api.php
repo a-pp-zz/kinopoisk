@@ -1,10 +1,4 @@
 <?php
-namespace AppZz\Http\Kinopoisk\Vendors;
-use \AppZz\Http\Kinopoisk\Kinopoisk;
-use \AppZz\Helpers\Arr;
-use \AppZz\Http\CurlClient;
-use \AppZz\Http\Helpers\FastImage;
-
 /**
  * Unofficial API Wrapper
  * @link https://kinopoiskapiunofficial.tech
@@ -12,6 +6,13 @@ use \AppZz\Http\Helpers\FastImage;
  * @author CoolSwitcher
  * @version 1.0.1
  */
+
+namespace AppZz\Http\Kinopoisk\Vendors;
+use \AppZz\Http\Kinopoisk\Kinopoisk;
+use \AppZz\Helpers\Arr;
+use \AppZz\Http\CurlClient;
+use \AppZz\Http\Helpers\FastImage;
+
 class Api extends Kinopoisk {
 
 	const API_HOST            = 'https://kinopoiskapiunofficial.tech';

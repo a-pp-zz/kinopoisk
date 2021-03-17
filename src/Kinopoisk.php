@@ -104,14 +104,21 @@ abstract class Kinopoisk {
      */
     protected $_rating = array ();
 
+    /**
+     * Errors holder
+     * @var array
+     */
+    protected $_errors = array ();
+
     protected function __construct ($kpid = null)
     {
         $kpid = intval ($kpid);
 
         if ( ! empty ($kpid)) {
             $this->_kpid = $kpid;
+            $this->_errors = array ();
         } else {
-            $this->_error ('Wrong kpid', 0);
+            $this->_error ('Wrong kpid', 0, true);
         }
     }
 
@@ -120,7 +127,7 @@ abstract class Kinopoisk {
         $vendor = '\AppZz\Http\Kinopoisk\Vendors\\' . $vendor;
 
         if ( ! class_exists($vendor)) {
-            $this->_error ('Vendor '.$vendor.' not exists', 0);
+            $this->_error ('Vendor '.$vendor.' not exists', 0, true);
         }
 
         return new $vendor ($kpid);
@@ -171,8 +178,15 @@ abstract class Kinopoisk {
         return $this;
     }
 
+    public function get_errors ()
+    {
+        return ( ! empty ($this->_errors)) ? $this->_errors : false;
+    }
+
+
     public function destruct ()
     {
+        $this->_errors = array ();
         unset ($this->_result);
     }
 
@@ -317,13 +331,15 @@ abstract class Kinopoisk {
         $response = $request->send();
 
         if ($response !== 200) {
-            $this->_error ('Ошибка получения данных ['.$url.']', $response);
+            $this->_error (sprintf('Ошибка получения данных по адресу: %s [%d]', $url, $response), $response, false);
+            return false;
         }
 
         $body = $request->get_body();
 
         if (empty($body)) {
-            $this->_error ('Пустой ответ ['.$url.']', 1001);
+            $this->_error (sprintf('Был получен пустой ответ по адресу: %s', $url), 1001, false);
+            return false;
         }
 
         return $body;
@@ -338,8 +354,12 @@ abstract class Kinopoisk {
         return $rating->get_result ();
     }
 
-    protected function _error ($message, $code = 0)
+    protected function _error ($message, $code = 0, $throw = false)
     {
-        throw new \Exception ($message, $code);
+        if ($throw) {
+            throw new \Exception ($message, $code);
+        } else {
+            $this->_errors[] = $message;
+        }
     }
 }
