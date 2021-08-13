@@ -13,6 +13,9 @@ class Parser extends Kinopoisk {
 
 	const KP_URL_FILM   = 'https://www.kinopoisk.ru/film/%d/';
 	const KP_URL_STILLS = 'https://www.kinopoisk.ru/film/%d/stills/';
+	const UA_DATA = 'Mozilla/5.0 (iPad; CPU OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A5376e Safari/8536.25';
+	const UA_DEFAULT = 'Mozilla/5.0 (iPhone; CPU iPhone OS 10_0 like Mac OS X) AppleWebKit/602.1.38 (KHTML, like Gecko) Version/10.0 Mobile/14A5297c Safari/602.1';
+
 
 	protected $_referer = 'https://www.kinopoisk.ru/';
 	protected $_content_type = 'html';
@@ -28,18 +31,20 @@ class Parser extends Kinopoisk {
 			$body = file_get_contents($cache);
 		} else {
 			$url = sprintf (Parser::KP_URL_FILM, $this->_kpid);
+			$this->_agent = Parser::UA_DATA;
 			$body = $this->_request ($url);
 			if ($cache) {
 				file_put_contents($cache, $body);
 			}
 		}
 
-		$this->_data = $this->_parse_json ($body);
+		$this->_data = $this->_parse_json ($body, 'data');
 		return ! empty ($this->_data);
 	}
 
 	public function get_rating ()
 	{
+		$this->_agent = Parser::UA_DEFAULT;
 		$this->_rating = $this->_get_rating();
 		return ! empty ($this->_rating);
 	}
@@ -50,13 +55,14 @@ class Parser extends Kinopoisk {
 			$body = file_get_contents($cache);
 		} else {
 			$url = sprintf (Parser::KP_URL_STILLS, $this->_kpid);
+			$this->_agent = Parser::UA_DEFAULT;
 			$body = $this->_request ($url);
 			if ($cache) {
 				file_put_contents($cache, $body);
 			}
 		}
 
-		$this->_frames = $this->_parse_json ($body);
+		$this->_frames = $this->_parse_json ($body, 'frames');
 
 		if ( ! empty ($this->_frames)) {
 			$this->_frames = Arr::path ($this->_frames, 'page.images');
@@ -74,38 +80,138 @@ class Parser extends Kinopoisk {
         return false;
     }
 
-	private function _parse_json ($body)
+	private function _parse_json ($body, $type = 'data')
 	{
-		$patterns = array (
-			'def' => '#\<script type="application\/(ld\+)?json"([\w\s\-]+)?\>(?<json>.*)\<\/script\>#iu',
-		);
+		$domd = new \DOMDocument();
+		libxml_use_internal_errors(true);
+		$domd->loadHTML($body);
+		libxml_use_internal_errors(false);
 
-		foreach ($patterns as $pat_id => $pattern) {
-			if (preg_match($pattern, $body, $parts)) {
-				$srch = array (
-					'@<(\w+)\b.*?>.*?<\/\1>@siu',
-					'@<(\w+)\b.*?>@siu',
-					'@<\/\w+>@siu'
-				);
+		if ($type == 'frames') {
+			$items = $domd->getElementsByTagName('script');
+			$data = array();
+			$json = false;
 
-				$repl = array (
-					'',
-					'',
-					''
-				);
+			foreach($items as $item) {
+				$outer_html = $domd->saveHTML($item);
+				$inner_html = $domd->saveHTML($item->firstChild);
+				$outer_html = urldecode ($outer_html);
+				$inner_html = urldecode ($inner_html);
 
-				$json = $parts['json'];
-				$json = urldecode($json);
-				$json = preg_replace($srch, $repl, $json);
-				$json = json_decode($json, TRUE);
+				if (strpos($outer_html, 'application/json') !== false) {
+					$data[] = $inner_html;
+				}
+			}
 
-				if (json_last_error() === JSON_ERROR_NONE) {
-					return $json;
+			if ( ! empty ($data)) {
+				$json = array_pop ($data);
+			}
+		} else {
+			$items = $domd->getElementById('__next');
+			$item = ! empty ($items->firstChild) ? $items->firstChild : false;
+
+			if ( ! empty ($item)) {
+				$json = $domd->saveHTML($item->firstChild);
+			} else {
+				return false;
+			}
+
+			$srch = array (
+				'@<(\w+)\b.*?>.*?<\/\1>@siu',
+				'@<(\w+)\b.*?>@siu',
+				'@<\/\w+>@siu'
+			);
+
+			$repl = array (
+				'',
+				'',
+				''
+			);
+
+			$json = urldecode ($json);
+			$json = preg_replace ($srch, $repl, $json);
+		}
+
+		$json = json_decode ($json, TRUE);
+
+		if (json_last_error() === JSON_ERROR_NONE) {
+
+			if ($type == 'data' AND empty ($json['actor']) AND empty ($json['director'])) {
+				$next_data = $this->_parse_next_data ($body);
+
+				if ( ! empty ($next_data)) {
+					$json = array_merge ($json, $next_data);
+				}
+			}
+
+			return $json;
+		}
+
+		return false;
+	}
+
+	private function _parse_next_data ($body)
+	{
+		$domd = new \DOMDocument();
+		libxml_use_internal_errors(true);
+		$domd->loadHTML($body);
+		libxml_use_internal_errors(false);
+
+		$json = false;
+		$data = array ();
+		$items = $domd->getElementById('__NEXT_DATA__');
+		$item = ! empty ($items->firstChild) ? $items->firstChild : false;
+
+		if ( ! empty ($item)) {
+			$json = $domd->saveHTML($item);
+		} else {
+			return $json;
+		}
+
+		$json = urldecode ($json);
+		$json = json_decode ($json, TRUE);
+
+		if (json_last_error() === JSON_ERROR_NONE) {
+			$persons = $data = array ();
+			$film = (array)Arr::path ($json, 'props.apolloState.data');
+
+			foreach ($film as $key => $values) {
+				if (preg_match ('#Person\:\d+#iu', $key)) {
+					$id = Arr::get ($values, 'id');
+					$name = Arr::get ($values, 'name');
+					$originalName = Arr::get ($values, 'originalName');
+					$persons[$id] = ! empty ($name) ? $name : $originalName;
+				}
+				elseif (preg_match ('#Film\:\d+#iu', $key)) {
+					foreach ($values as $film_key => $film_data) {
+						if (stripos ($film_key, 'members(') !== false) {
+							if (stripos ($film_key, 'DIRECTOR') !== false) {
+								$subkey = 'director';
+							} elseif (stripos ($film_key, 'ACTOR') !== false) {
+								$subkey = 'actor';
+							} else {
+								continue;
+							}
+
+							foreach ((array)Arr::get ($film_data, 'items') as $item) {
+								$person_id = Arr::path ($item, 'person.__ref');
+								$person_id = str_replace ('Person:', '', $person_id);
+
+								if ($person_id) {
+									$person = Arr::get ($persons, $person_id);
+									if ($person) {
+										$data[$subkey][] = array ('name'=>$person, 'url'=>'/name/'.$person_id);
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 		}
 
-		return false;
+		unset ($persons);
+		return $data;
 	}
 
 	protected function _populate ()

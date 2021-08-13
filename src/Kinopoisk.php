@@ -331,7 +331,7 @@ abstract class Kinopoisk {
         $response = $request->send();
 
         if ($response !== 200) {
-            $this->_error (sprintf('Ошибка получения данных по адресу: %s [%d]', $url, $response), $response, false);
+            //$this->_error (sprintf('Ошибка получения данных по адресу: %s [%d]', $url, $response), $response, false);
             return false;
         }
 
