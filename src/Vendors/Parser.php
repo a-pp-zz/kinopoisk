@@ -94,8 +94,8 @@ class Parser extends Kinopoisk {
 			$json = false;
 
 			foreach($items as $item) {
-				$outer_html = utf8_decode ($domd->saveHTML($item));
-				$inner_html = utf8_decode ($domd->saveHTML($item->firstChild));
+				$outer_html = $this->_utf_decode ($domd->saveHTML($item));
+				$inner_html = $this->_utf_decode ($domd->saveHTML($item->firstChild));
 				$outer_html = urldecode ($outer_html);
 				$inner_html = urldecode ($inner_html);
 
@@ -112,7 +112,7 @@ class Parser extends Kinopoisk {
 			$item = ! empty ($items->firstChild) ? $items->firstChild : false;
 
 			if ( ! empty ($item)) {
-				$json = utf8_decode ($domd->saveHTML($item->firstChild));
+				$json = $this->_utf_decode ($domd->saveHTML($item->firstChild));
 				$json = urldecode ($json);
 			} else {
 				return false;
@@ -165,7 +165,7 @@ class Parser extends Kinopoisk {
 		$item = ! empty ($items->firstChild) ? $items->firstChild : false;
 
 		if ( ! empty ($item)) {
-			$json = utf8_decode ($domd->saveHTML($item));
+			$json = $this->_utf_decode ($domd->saveHTML($item));
 			$json = urldecode ($json);
 		} else {
 			return $json;
@@ -214,6 +214,15 @@ class Parser extends Kinopoisk {
 
 		unset ($persons);
 		return $data;
+	}
+
+	private function _utf_decode ($text)
+	{
+		if (version_compare(PHP_VERSION, '7.0.0') >= 0) {
+			return $text;
+		}
+
+		return utf8_decode ($text);
 	}
 
 	protected function _populate ()
