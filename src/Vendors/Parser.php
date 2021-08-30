@@ -19,6 +19,10 @@ class Parser extends Kinopoisk {
 
 	protected $_referer = 'https://www.kinopoisk.ru/';
 	protected $_content_type = 'html';
+	protected $_frames_populated = false;
+
+	const THUMB_SIZE = 200;
+	const IMAGE_SIZE = 1280;
 
     public function __construct ($kpid = null)
     {
@@ -62,10 +66,15 @@ class Parser extends Kinopoisk {
 			}
 		}
 
-		$this->_frames = $this->_parse_json ($body, 'frames');
+		$images = $this->_parse_json ($body, 'frames');
 
-		if ( ! empty ($this->_frames)) {
-			$this->_frames = Arr::path ($this->_frames, 'page.images');
+		if ( ! empty ($images)) {
+			$this->_frames = Arr::path ($images, 'page.images');
+
+			if ( ! $this->_frames) {
+				$this->_frames = Arr::get ($images, 'picshots');
+				$this->_frames_populated = true;
+			}
 
 			if ($max AND ! empty ($this->_frames)) {
 				$this->_frames = array_slice ($this->_frames, 0, $max);
@@ -134,10 +143,17 @@ class Parser extends Kinopoisk {
 		}
 
 		$json = json_decode ($json, TRUE);
+		$next_data = false;
 
 		if (json_last_error() === JSON_ERROR_NONE) {
 
 			if ($type == 'data' AND empty ($json['actor']) AND empty ($json['director'])) {
+				$next_data = true;
+			} elseif ($type == 'frames' AND empty ($json['picshots'])) {
+				$next_data = true;
+			}
+
+			if ($next_data) {
 				$next_data = $this->_parse_next_data ($body);
 
 				if ( ! empty ($next_data)) {
@@ -207,6 +223,27 @@ class Parser extends Kinopoisk {
 								}
 							}
 						}
+						if (stripos ($film_key, 'images') !== false) {
+							foreach ((array)Arr::get ($film_data, 'items') as $item) {
+								$type  = Arr::get ($item, 'type');
+
+								if ($type != 'STILL') {
+									continue;
+								}
+
+								$image = sprintf ('%s/%dx%d', Arr::path ($item, 'image.avatarsUrl'), Parser::IMAGE_SIZE, Parser::IMAGE_SIZE);
+								$thumb = sprintf ('%s/%dx%d', Arr::path ($item, 'image.avatarsUrl'), Parser::THUMB_SIZE, Parser::THUMB_SIZE);
+
+								if ($image) {
+									$data['picshots'][] = array ('image'=>$image, 'thumb'=>$thumb, 'width'=>Parser::IMAGE_SIZE, 'height'=>Parser::IMAGE_SIZE);
+								}
+							}
+						}
+						/*
+						if (($poster = Arr::path ($values, 'poster.avatarsUrl'))) {
+							$data['poster2'] = $poster;
+						}
+						*/
 					}
 				}
 			}
@@ -303,22 +340,25 @@ class Parser extends Kinopoisk {
 
 				case 'frames':
 					$pop_key = 'picshots';
-					$value = Kinopoisk::array_pluck ($value, 'baseUrl');
 
-					if ( ! empty ($value)) {
-						foreach ($value as &$image) {
+					if ( ! $this->_frames_populated) {
+						$value = Kinopoisk::array_pluck ($value, 'baseUrl');
 
-							$size = Kinopoisk::cdn_image_size ($image);
-							$thumb = $image;
+						if ( ! empty ($value)) {
+							foreach ($value as &$image) {
 
-							if (is_array($size) AND count ($size) === 2) {
-								list ($width, $height) = $size;
-								$thumb = str_replace ($width.'x'.$height, '200x200', $image);
-							} else {
-								$width = $height = 0;
+								$size = Kinopoisk::cdn_image_size ($image);
+								$thumb = $image;
+
+								if (is_array($size) AND count ($size) === 2) {
+									list ($width, $height) = $size;
+									$thumb = str_replace ($width.'x'.$height, Parser::THUMB_SIZE.'x'.Parser::THUMB_SIZE, $image);
+								} else {
+									$width = $height = 0;
+								}
+
+								$image = array ('image'=>$image, 'thumb'=>$thumb, 'width'=>$width, 'height'=>$height);
 							}
-
-							$image = array ('image'=>$image, 'thumb'=>$thumb, 'width'=>$width, 'height'=>$height);
 						}
 					}
 				break;
