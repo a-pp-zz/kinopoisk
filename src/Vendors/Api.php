@@ -4,7 +4,7 @@
  * @link https://kinopoiskapiunofficial.tech
  * @package Kinopoisk/Api
  * @author CoolSwitcher
- * @version 1.0.1
+ * @version 1.2
  */
 
 namespace AppZz\Http\Kinopoisk\Vendors;
@@ -16,13 +16,12 @@ use \AppZz\Http\Helpers\FastImage;
 class Api extends Kinopoisk {
 
 	const API_HOST            = 'https://kinopoiskapiunofficial.tech';
-	const API_FILMS_ENDPOINT  = '/api/v%s/films/%d';
-	const API_FRAMES_ENDPOINT = '/api/v%s/films/%d/frames';
+	const API_FILMS_ENDPOINT  = '/api/v2.2/films/%d';
+	const API_FRAMES_ENDPOINT = '/api/v2.1/films/%d/frames';
 	const API_STAFF_ENDPOINT  = '/api/v1/staff';
 
 	protected $_referer = '';
 	protected $_content_type = 'json';
-	protected $_version = '2.1';
 	protected $_staff;
 
     public function __construct ($kpid = null)
@@ -32,7 +31,6 @@ class Api extends Kinopoisk {
 
     public function version ($version = '2.1')
     {
-    	$this->_version = $version;
     	return $this;
     }
 
@@ -46,12 +44,12 @@ class Api extends Kinopoisk {
 
 	public function get_data ($cache = false)
 	{
-		$url = Api::API_HOST.sprintf (Api::API_FILMS_ENDPOINT, $this->_version, $this->_kpid);
+		$url = Api::API_HOST.sprintf (Api::API_FILMS_ENDPOINT, $this->_kpid);
 		$this->_data = $this->_request ($url);
 
 		if (is_object($this->_data)) {
 			$this->_data = (array)json_decode(json_encode($this->_data), true);
-			$this->_data = Arr::get ($this->_data, 'data');
+			//$this->_data = Arr::get ($this->_data, 'data');
 		}
 
 		return ! empty ($this->_data);
@@ -59,7 +57,7 @@ class Api extends Kinopoisk {
 
 	public function get_frames ($max = 5, $cache = false)
 	{
-		$url = Api::API_HOST.sprintf (Api::API_FRAMES_ENDPOINT, $this->_version, $this->_kpid);
+		$url = Api::API_HOST.sprintf (Api::API_FRAMES_ENDPOINT, $this->_kpid);
 		$this->_frames = $this->_request ($url);
 
 		if (is_object($this->_frames)) {
@@ -158,7 +156,7 @@ class Api extends Kinopoisk {
 		foreach ($this->_result as $key=>&$value) {
 
 			switch ($key) {
-				case 'filmId':
+				case 'kinopoiskId':
 					$pop_key = 'kp_id';
 				break;
 				case 'countries':
@@ -172,21 +170,28 @@ class Api extends Kinopoisk {
 
 				case 'filmLength':
 					$pop_key = 'duration';
+					$value = Kinopoisk::duration_format ($value*60);
 				break;
 
 				case 'nameRu':
 					$pop_key = 'name';
 				break;
 
-				case 'nameEn':
+				case 'nameOriginal':
 					$pop_key = 'original';
 				break;
 
 				case 'description':
 				case 'year':
-				case 'rating_kp':
-				case 'rating_imdb':
 					$pop_key = $key;
+				break;
+
+				case 'ratingKinopoisk':
+					$pop_key = 'rating_kp';
+				break;
+
+				case 'ratingImdb':
+					$pop_key = 'rating_imdb';
 				break;
 
 				case 'director':
