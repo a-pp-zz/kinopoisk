@@ -327,11 +327,14 @@ abstract class Kinopoisk {
         }
 
         $request->accept($this->_content_type, 'gzip', 'ru-RU');
+        $request->strict_ssl(FALSE);
 
         $response = $request->send();
 
         if ($response !== 200) {
-            //$this->_error (sprintf('Ошибка получения данных по адресу: %s [%d]', $url, $response), $response, false);
+            if ($response === 0) {
+                $this->_error (sprintf('Ошибка получения данных по адресу: %s [%d]', $url, $response), $response, false);
+            }
             return false;
         }
 
