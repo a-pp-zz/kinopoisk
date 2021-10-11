@@ -175,10 +175,12 @@ class Api extends Kinopoisk {
 
 				case 'nameRu':
 					$pop_key = 'name';
+					$value = ! empty ($value) ? $value : '';
 				break;
 
 				case 'nameOriginal':
 					$pop_key = 'original';
+					$value = ! empty ($value) ? $value : '';
 				break;
 
 				case 'description':
