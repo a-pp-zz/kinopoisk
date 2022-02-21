@@ -17,7 +17,7 @@ class Api extends Kinopoisk {
 
 	const API_HOST            = 'https://kinopoiskapiunofficial.tech';
 	const API_FILMS_ENDPOINT  = '/api/v2.2/films/%d';
-	const API_FRAMES_ENDPOINT = '/api/v2.1/films/%d/frames';
+	const API_FRAMES_ENDPOINT = '/api/v2.2/films/%d/images';
 	const API_STAFF_ENDPOINT  = '/api/v1/staff';
 
 	protected $_referer = '';
@@ -49,7 +49,11 @@ class Api extends Kinopoisk {
 
 		if (is_object($this->_data)) {
 			$this->_data = (array)json_decode(json_encode($this->_data), true);
-			//$this->_data = Arr::get ($this->_data, 'data');
+			$poster = $this->_get_images('POSTER', 1, 1);
+
+			if ( ! empty ($poster)) {
+				$this->_data['posterUrl'] = Arr::path($poster, '0.imageUrl');
+			}
 		}
 
 		return ! empty ($this->_data);
@@ -57,18 +61,7 @@ class Api extends Kinopoisk {
 
 	public function get_frames ($max = 5, $cache = false)
 	{
-		$url = Api::API_HOST.sprintf (Api::API_FRAMES_ENDPOINT, $this->_kpid);
-		$this->_frames = $this->_request ($url);
-
-		if (is_object($this->_frames)) {
-			$this->_frames = (array)json_decode(json_encode($this->_frames), true);
-			$this->_frames = (array)Arr::get ($this->_frames, 'frames');
-
-			if ($max AND ! empty ($this->_frames)) {
-				$this->_frames = array_slice ($this->_frames, 0, $max);
-			}
-		}
-
+		$this->_frames = $this->_get_images('STILL', $max, 1);
 		return ! empty ($this->_frames);
 	}
 
@@ -127,6 +120,25 @@ class Api extends Kinopoisk {
 		}
 
 		return $url;
+	}
+
+	protected function _get_images ($type = 'STILL', $max = 5, $page = 1)
+	{
+		$ret = array ();
+		$url = Api::API_HOST.sprintf (Api::API_FRAMES_ENDPOINT, $this->_kpid).'?'.http_build_query (array('type'=>$type, 'page'=>$page));
+		$images = $this->_request ($url);
+
+		if (is_object($images)) {
+			$images = (array)json_decode(json_encode($images), true);
+			$total = Arr::get($images, 'total', 0);
+			$items = (array)Arr::get($images, 'items');
+
+			if ($total > 0 AND ! empty ($items)) {
+				$ret = array_slice ($items, 0, $max);
+			}
+		}
+
+		return $ret;
 	}
 
 	protected function _populate ()
@@ -204,7 +216,7 @@ class Api extends Kinopoisk {
 
 				case 'posterUrl':
 					$pop_key = 'poster';
-					$value = $this->_clean_picshot_url ($value);
+					//$value = $this->_clean_picshot_url ($value);
 					$fi = new FastImage ($value);
 					$size = $fi->get_size ();
 
@@ -220,16 +232,15 @@ class Api extends Kinopoisk {
 
 				case 'frames':
 					$pop_key = 'picshots';
-					$value = array_splice ($value, 0, 5);
 					foreach ($value as &$image) {
-						$image_url = Arr::get ($image, 'image');
-						$preview_url = Arr::get ($image, 'preview');
+						$image_url = Arr::get ($image, 'imageUrl');
+						$preview_url = Arr::get ($image, 'previewUrl');
 
-						$image_url = $this->_clean_picshot_url ($image_url);
-						$preview_url = $this->_clean_picshot_url ($preview_url);
+						//$image_url = $this->_clean_picshot_url ($image_url);
+						//$preview_url = $this->_clean_picshot_url ($preview_url);
 
 						if ( ! empty ($image_url)) {
-							$fi = new FastImage ($image['image']);
+							$fi = new FastImage ($image_url);
 							$size = $fi->get_size ();
 
 							if (is_array($size) AND count ($size) === 2) {
