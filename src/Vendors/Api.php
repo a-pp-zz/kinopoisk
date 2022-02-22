@@ -49,11 +49,13 @@ class Api extends Kinopoisk {
 
 		if (is_object($this->_data)) {
 			$this->_data = (array)json_decode(json_encode($this->_data), true);
+			/*
 			$poster = $this->_get_images('POSTER', 1, 1);
 
 			if ( ! empty ($poster)) {
 				$this->_data['posterUrl'] = Arr::path($poster, '0.imageUrl');
 			}
+			*/
 		}
 
 		return ! empty ($this->_data);
