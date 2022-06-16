@@ -67,6 +67,11 @@ class Api extends Kinopoisk {
 		return ! empty ($this->_frames);
 	}
 
+	public function get_posters ($max = 5)
+	{
+		return $this->_get_images('POSTER', $max, 1);
+	}
+
 	public function get_staff ($max = 10, $cache = false)
 	{
 		$url = Api::API_HOST.Api::API_STAFF_ENDPOINT.'?'.http_build_query (array('filmId'=>$this->_kpid));
