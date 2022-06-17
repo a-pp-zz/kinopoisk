@@ -50,7 +50,7 @@ class Api extends Kinopoisk {
 		if (is_object($this->_data)) {
 			$this->_data = (array)json_decode(json_encode($this->_data), true);
 			/*
-			$poster = $this->_get_images('POSTER', 1, 1);
+			$poster = $this->get_images('POSTER', 1, 1);
 
 			if ( ! empty ($poster)) {
 				$this->_data['posterUrl'] = Arr::path($poster, '0.imageUrl');
@@ -63,13 +63,13 @@ class Api extends Kinopoisk {
 
 	public function get_frames ($max = 5, $cache = false)
 	{
-		$this->_frames = $this->_get_images('STILL', $max, 1);
+		$this->_frames = $this->get_images('STILL', $max, 1);
 		return ! empty ($this->_frames);
 	}
 
 	public function get_posters ($max = 5)
 	{
-		return $this->_get_images('POSTER', $max, 1);
+		return $this->get_images('POSTER', $max, 1);
 	}
 
 	public function get_staff ($max = 10, $cache = false)
@@ -109,6 +109,25 @@ class Api extends Kinopoisk {
 		return ! empty ($this->_rating);
 	}
 
+	public function get_images ($type = 'STILL', $max = 5, $page = 1)
+	{
+		$ret = array ();
+		$url = Api::API_HOST.sprintf (Api::API_FRAMES_ENDPOINT, $this->_kpid).'?'.http_build_query (array('type'=>$type, 'page'=>$page));
+		$images = $this->_request ($url);
+
+		if (is_object($images)) {
+			$images = (array)json_decode(json_encode($images), true);
+			$total = Arr::get($images, 'total', 0);
+			$items = (array)Arr::get($images, 'items');
+
+			if ($total > 0 AND ! empty ($items)) {
+				$ret = array_slice ($items, 0, $max);
+			}
+		}
+
+		return $ret;
+	}
+
 	private function _implode_arrays ($array = array (), $sep = ', ')
 	{
 		foreach ($array as $key=>&$value) {
@@ -127,25 +146,6 @@ class Api extends Kinopoisk {
 		}
 
 		return $url;
-	}
-
-	protected function _get_images ($type = 'STILL', $max = 5, $page = 1)
-	{
-		$ret = array ();
-		$url = Api::API_HOST.sprintf (Api::API_FRAMES_ENDPOINT, $this->_kpid).'?'.http_build_query (array('type'=>$type, 'page'=>$page));
-		$images = $this->_request ($url);
-
-		if (is_object($images)) {
-			$images = (array)json_decode(json_encode($images), true);
-			$total = Arr::get($images, 'total', 0);
-			$items = (array)Arr::get($images, 'items');
-
-			if ($total > 0 AND ! empty ($items)) {
-				$ret = array_slice ($items, 0, $max);
-			}
-		}
-
-		return $ret;
 	}
 
 	protected function _populate ()
