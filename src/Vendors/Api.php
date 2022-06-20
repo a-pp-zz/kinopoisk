@@ -11,7 +11,6 @@ namespace AppZz\Http\Kinopoisk\Vendors;
 use \AppZz\Http\Kinopoisk\Kinopoisk;
 use \AppZz\Helpers\Arr;
 use \AppZz\Http\CurlClient;
-use \AppZz\Http\Helpers\FastImage;
 
 class Api extends Kinopoisk {
 
@@ -223,18 +222,8 @@ class Api extends Kinopoisk {
 
 				case 'posterUrl':
 					$pop_key = 'poster';
-					//$value = $this->_clean_picshot_url ($value);
-					$fi = new FastImage ($value);
-					$size = $fi->get_size ();
-
-					if (is_array($size) AND count ($size) === 2) {
-						list ($width, $height) = $size;
-					} else {
-						$width = $height = 0;
-					}
-
+					$width = $height = 0;
 					$value = array ('image'=>$value, 'width'=>$width, 'height'=>$height);
-					unset($fi);
 				break;
 
 				case 'frames':
@@ -243,21 +232,9 @@ class Api extends Kinopoisk {
 						$image_url = Arr::get ($image, 'imageUrl');
 						$preview_url = Arr::get ($image, 'previewUrl');
 
-						//$image_url = $this->_clean_picshot_url ($image_url);
-						//$preview_url = $this->_clean_picshot_url ($preview_url);
-
 						if ( ! empty ($image_url)) {
-							$fi = new FastImage ($image_url);
-							$size = $fi->get_size ();
-
-							if (is_array($size) AND count ($size) === 2) {
-								list ($width, $height) = $size;
-							} else {
-								$width = $height = 0;
-							}
-
+							$width = $height = 0;
 							$image = array ('image'=>$image_url, 'thumb'=>$preview_url, 'width'=>$width, 'height'=>$height);
-							unset($fi);
 						}
 					}
 				break;
