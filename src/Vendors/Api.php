@@ -18,6 +18,7 @@ class Api extends Kinopoisk {
 	const API_FILMS_ENDPOINT  = '/api/v2.2/films/%d';
 	const API_FRAMES_ENDPOINT = '/api/v2.2/films/%d/images';
 	const API_STAFF_ENDPOINT  = '/api/v1/staff';
+	const API_HEALTH          = '/api/v1/health';
 
 	protected $_referer = '';
 	protected $_content_type = 'json';
@@ -121,6 +122,40 @@ class Api extends Kinopoisk {
 
 			if ($total > 0 AND ! empty ($items)) {
 				$ret = array_slice ($items, 0, $max);
+			}
+		}
+
+		return $ret;
+	}
+
+	public function health ()
+	{
+		$needed = array ();
+		array_push($needed, Api::API_FILMS_ENDPOINT);
+		array_push($needed, Api::API_FRAMES_ENDPOINT);
+		array_push($needed, Api::API_STAFF_ENDPOINT);
+
+		$needed = array_map (function ($v) {
+			return str_replace ('%d', '{id}', $v);
+		}, $needed);
+
+		$url = Api::API_HOST.Api::API_HEALTH;
+		$this->_referer = Api::API_HOST.'/status';
+		$data = $this->_request ($url);
+		$this->_referer = '';
+		$ret = array ();
+
+		if ( ! empty ($data) AND ! empty ($data->endpointToStatusList)) {
+			foreach ($data->endpointToStatusList as $values) {
+				if (in_array($values->first, $needed)) {
+					$status = 'OK';
+
+					if ($values->second != 200) {
+						$status = 'Error ' . $values->second;
+					}
+
+					$ret[$values->first] = $status;
+				}
 			}
 		}
 
