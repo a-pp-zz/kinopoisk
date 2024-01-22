@@ -118,7 +118,7 @@ abstract class Kinopoisk {
             $this->_kpid = $kpid;
             $this->_errors = array ();
         } else {
-            $this->_error ('Wrong kpid', 0, true);
+            //$this->_error ('Wrong kpid', 0, true);
         }
     }
 

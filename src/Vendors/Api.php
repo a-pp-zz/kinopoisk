@@ -4,7 +4,7 @@
  * @link https://kinopoiskapiunofficial.tech
  * @package Kinopoisk/Api
  * @author CoolSwitcher
- * @version 1.2
+ * @version 1.3
  */
 
 namespace AppZz\Http\Kinopoisk\Vendors;
@@ -19,6 +19,7 @@ class Api extends Kinopoisk {
 	const API_FRAMES_ENDPOINT = '/api/v2.2/films/%d/images';
 	const API_STAFF_ENDPOINT  = '/api/v1/staff';
 	const API_HEALTH          = '/api/v1/health';
+	const API_SEARCH          = '/api/v2.2/films';
 
 	protected $_referer = '';
 	protected $_content_type = 'json';
@@ -126,6 +127,33 @@ class Api extends Kinopoisk {
 		}
 
 		return $ret;
+	}
+
+	public function search ($keyword = '', $year = 0)
+	{
+		$query = array (
+			'order'      => 'YEAR', //RATING, NUM_VOTE, YEAR
+			'type'       => 'ALL', //FILM, TV_SHOW, TV_SERIES, MINI_SERIES, ALL
+			'ratingFrom' => 0,
+			'ratingTo'   => 10,
+			'yearFrom'   => $year,
+			'yearTo'     => $year,
+			'keyword'    => $keyword,
+			'page'       => 1
+		);
+
+		$url = Api::API_HOST.Api::API_SEARCH.'?'.http_build_query ($query);
+		$films = $this->_request ($url);
+
+		if (is_object($films) AND ! empty ($films->items)) {
+			foreach ($films->items as $item) {
+				if ( ! empty ($item->kinopoiskId) AND $item->year == $year) {
+					return 'https://www.kinopoisk.ru/film/'.$item->kinopoiskId;
+				}
+			}
+		}
+
+		return false;
 	}
 
 	public function health ()
