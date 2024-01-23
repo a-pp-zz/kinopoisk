@@ -136,24 +136,31 @@ class Api extends Kinopoisk {
 			'type'       => 'ALL', //FILM, TV_SHOW, TV_SERIES, MINI_SERIES, ALL
 			'ratingFrom' => 0,
 			'ratingTo'   => 10,
-			'yearFrom'   => $year,
-			'yearTo'     => $year,
+			'yearFrom'   => ($year-1),
+			'yearTo'     => ($year+1),
 			'keyword'    => $keyword,
 			'page'       => 1
 		);
 
 		$url = Api::API_HOST.Api::API_SEARCH.'?'.http_build_query ($query);
 		$films = $this->_request ($url);
+		$founded = false;
 
 		if (is_object($films) AND ! empty ($films->items)) {
+
 			foreach ($films->items as $item) {
 				if ( ! empty ($item->kinopoiskId) AND $item->year == $year) {
-					return 'https://www.kinopoisk.ru/film/'.$item->kinopoiskId;
+					$founded = $item->kinopoiskId;
 				}
+			}
+
+			if ( ! $founded) {
+				$item = array_shift ($item);
+				$founded = ! empty ($item->kinopoiskId) ? $item->kinopoiskId : false;
 			}
 		}
 
-		return false;
+		return $founded ? 'https://www.kinopoisk.ru/film/' . $founded : false;
 	}
 
 	public function health ()
