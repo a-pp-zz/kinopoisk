@@ -155,7 +155,7 @@ class Api extends Kinopoisk {
 			}
 
 			if ( ! $founded) {
-				$item = array_shift ($item);
+				$item = array_shift ($films->items);
 				$founded = ! empty ($item->kinopoiskId) ? $item->kinopoiskId : false;
 			}
 		}
