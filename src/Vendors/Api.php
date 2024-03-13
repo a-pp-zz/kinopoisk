@@ -144,23 +144,32 @@ class Api extends Kinopoisk {
 
 		$url = Api::API_HOST.Api::API_SEARCH.'?'.http_build_query ($query);
 		$films = $this->_request ($url);
-		$founded = false;
+
+		$this->_data = $this->_staff = $this->_frames = array ();
+		$this->_kpid = null;
 
 		if (is_object($films) AND ! empty ($films->items)) {
 
 			foreach ($films->items as $item) {
-				if ( ! empty ($item->kinopoiskId) AND $item->year == $year) {
-					$founded = $item->kinopoiskId;
+				if ( ! empty ($item) AND $item->year == $year) {
+					$this->_data = $item;
 				}
 			}
 
-			if ( ! $founded) {
-				$item = array_shift ($films->items);
-				$founded = ! empty ($item->kinopoiskId) ? $item->kinopoiskId : false;
+			if ( ! $this->_data) {
+				$this->_data = array_shift ($films->items);
 			}
 		}
 
-		return $founded ? 'https://www.kinopoisk.ru/film/' . $founded : false;
+		if (is_object($this->_data)) {
+			$this->_data = (array)json_decode(json_encode($this->_data), true);
+		}
+
+		if ( ! empty ($this->_data)) {
+			$this->_kpid = Arr::get ($this->_data, 'kinopoiskId');
+		}
+
+		return ! empty ($this->_data);
 	}
 
 	public function health ()
@@ -200,12 +209,31 @@ class Api extends Kinopoisk {
 	private function _implode_arrays ($array = array (), $sep = ', ')
 	{
 		foreach ($array as $key=>&$value) {
-			if (is_array($value)) {
+			if (is_array($value) and ! empty ($value)) {
 				$value = implode ($sep, $value);
 			}
 		}
 
 		return implode ($sep, $array);
+	}
+
+	private function _check_array ($array = array ())
+	{
+		if (empty($array)) {
+			return false;
+		}
+
+		if ( ! is_array($array)) {
+			return false;
+		}
+
+		$values = trim(implode ('', $array));
+
+		if (empty ($values)) {
+			return false;
+		}
+
+		return true;
 	}
 
 	private function _clean_picshot_url ($url)
@@ -287,7 +315,7 @@ class Api extends Kinopoisk {
 				case 'director':
 				case 'actor':
 					$pop_key = $key == 'actor' ? $key.'s' : $key;
-					$value = ( ! empty ($value) AND is_array ($value)) ? implode (', ', $value) : '';
+					$value = $this->_check_array ($value) ? implode (', ', $value) : '';
 				break;
 
 				case 'posterUrl':
